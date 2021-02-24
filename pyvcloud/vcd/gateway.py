@@ -556,7 +556,7 @@ class Gateway(object):
             e_ip_range.append(E.EndAddress(range_token[1]))
             existing_ip_ranges.append(e_ip_range)
 
-    def add_sub_allocated_ip_pools(self, ext_network, ip_ranges):
+    def add_sub_allocated_ip_pools(self, ext_network, ip_ranges, gateway_subnet):
         """Adds new ip range present to the sub allocate pool of gateway.
 
         :param ext_network: external network connected to the gateway.
@@ -571,17 +571,29 @@ class Gateway(object):
         :rtype: lxml.objectify.ObjectifiedElement
         """
         gateway = self.get_resource()
-        for gateway_inf in \
-                gateway.Configuration.GatewayInterfaces.GatewayInterface:
+        gw_infs = gateway.Configuration.GatewayInterfaces.findall("*")
+        for gateway_inf in gw_infs:
             if gateway_inf.Name == ext_network:
-                subnet_participation = gateway_inf.SubnetParticipation
-                existing_ip_ranges = self.get_sub_allocate_ip_ranges_element(
-                    subnet_participation)
-                if existing_ip_ranges is None:
-                    existing_ip_ranges = E.IpRanges()
-                    subnet_participation.IpAddress.addnext(existing_ip_ranges)
-                self.__add_ip_ranges_element(existing_ip_ranges, ip_ranges)
-                break
+                # a bug in pyvcloud. Even if the Gateway has multiple subnet participations.
+                # `interface` object only has one `interface.SubnetParticipation`.
+                # our current workaround is to loop the `interface` object and search for
+                # matching objects that match SubnetParticipation criteria.
+                subnet_participations = []
+                interface_haystack = gateway_inf.findall("*")
+                for neddle in interface_haystack:
+                    if hasattr(neddle, "SubnetPrefixLength"):
+                        subnet_participations.append(neddle)
+
+                for subnet_participation_ in subnet_participations:
+                    if subnet_participation_.Gateway == gateway_subnet:
+                        subnet_participation = subnet_participation_
+                        existing_ip_ranges = self.get_sub_allocate_ip_ranges_element(
+                                subnet_participation)
+                        if existing_ip_ranges is None:
+                            existing_ip_ranges = E.IpRanges()
+                            subnet_participation.IpAddress.addnext(existing_ip_ranges)
+                        self.__add_ip_ranges_element(existing_ip_ranges, ip_ranges)
+                        break
 
         return self.client.put_linked_resource(
             self.resource, RelationType.EDIT, EntityType.EDGE_GATEWAY.value,
