@@ -1427,12 +1427,13 @@ class Org(object):
         acl = Acl(self.client, catalog_resource)
         return acl.unshare_from_org_members()
 
-    def update_org(self, is_enabled=None):
+    def update_org(self, is_enabled=None, settings=None):
         """Update an organization to enable/disable it.
 
         This operation can only be performed by an user with admin privileges.
 
         :param bool is_enabled: flag to enable/disable the organization.
+        :param dict settings: organization settings.
 
         :return: an object containing EntityType.ADMIN_ORG XML data
             representing the updated organization.
@@ -1446,6 +1447,26 @@ class Org(object):
                 return self.client.put_resource(self.href_admin,
                                                 org_admin_resource,
                                                 EntityType.ADMIN_ORG.value)
+
+        if settings is not None:
+            if hasattr(org_admin_resource, "Settings"):
+
+                xml_settings = settings.get_settings()
+                if hasattr(xml_settings, "VAppLeaseSettings"):
+                    org_admin_resource["Settings"]["VAppLeaseSettings"] = xml_settings[
+                    "VAppLeaseSettings"
+                ]
+                if hasattr(xml_settings, "VAppTemplateLeaseSettings"):
+                    org_admin_resource["Settings"][
+                    "VAppTemplateLeaseSettings"
+                ] = xml_settings["VAppTemplateLeaseSettings"]
+                # ldap setting doesn't have OrgLdapSettings keyword
+                if settings.ldap_settings:
+                    org_admin_resource["Settings"][
+                        "OrgLdapSettings"
+                    ] = settings.ldap_settings
+
+
         return org_admin_resource
 
     def create_org_vdc(self,
