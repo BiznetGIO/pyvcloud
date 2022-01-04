@@ -64,6 +64,7 @@ class System(object):
             E.IsEnabled(is_enabled),
             name=org_name)
 
+        # Append setting if provided
         if settings is None:
             org_params.append(E.Settings())
         else:
