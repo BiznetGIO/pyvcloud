@@ -720,6 +720,10 @@ def _objectify_response(response, as_object=True):
 
     :rtype: lxml.objectify.ObjectifiedElement
     """
+    # Don't objectivy failure response. It doesn't contain anything meaningful
+    if response.status_code not in {200, 201}:
+        return None
+
     if _response_has_content(response):
         if as_object:
             return objectify.fromstring(response.content)
